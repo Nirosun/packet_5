@@ -32,6 +32,10 @@ public class MPLS {
 		return this.label;
 	}
 	
+	public void setLabel(int label) {
+		this.label = label;
+	}
+	
 	/**
 	 * Returns the traffic class of this MPLS header
 	 * @return the traffic class of this MPLS header

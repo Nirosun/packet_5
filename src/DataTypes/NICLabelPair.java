@@ -9,9 +9,9 @@ package DataTypes;
 
 import NetworkElements.*;
 
-public class NICVCPair implements Comparable<NICVCPair>{
+public class NICLabelPair implements Comparable<NICLabelPair>{
 	private LSRNIC nic; // The nic of the pair
-	private int vc; // the VC of the pair
+	private int label; // the VC of the pair
 	
 	/**
 	 * Constructor for a pair of (nic, vc)
@@ -19,9 +19,9 @@ public class NICVCPair implements Comparable<NICVCPair>{
 	 * @param vc the vc that is in the pair
 	 * @since 1.0
 	 */
-	public NICVCPair(LSRNIC nic, int vc){
+	public NICLabelPair(LSRNIC nic, int label){
 		this.nic = nic;
-		this.vc = vc;
+		this.label = label;
 	}
 	
 	/**
@@ -39,7 +39,7 @@ public class NICVCPair implements Comparable<NICVCPair>{
 	 * @since 1.0
 	 */
 	public int getVC(){
-		return this.vc;
+		return this.label;
 	}
 	
 	/**
@@ -48,8 +48,8 @@ public class NICVCPair implements Comparable<NICVCPair>{
 	 * @since 1.0
 	 */
 	public boolean equals(Object o){
-		if(o instanceof NICVCPair){
-			NICVCPair other = (NICVCPair) o;
+		if(o instanceof NICLabelPair){
+			NICLabelPair other = (NICLabelPair) o;
 			
 			if(other.getNIC()==this.getNIC() && other.getVC()==this.getVC())
 				return true;
@@ -63,7 +63,7 @@ public class NICVCPair implements Comparable<NICVCPair>{
 	 * @returns if this object is less than, equal to, or greater than a given object
 	 * @since 1.0
 	 */
-	public int compareTo(NICVCPair o){
+	public int compareTo(NICLabelPair o){
 		return this.getVC()-o.getVC();
 	}
 }

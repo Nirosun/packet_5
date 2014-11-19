@@ -1,6 +1,7 @@
 package NetworkElements;
 
 import DataTypes.*;
+
 import java.util.*;
 
 public class LSRNIC {
@@ -39,10 +40,10 @@ public class LSRNIC {
 				System.out.println("Error (LSR NIC): You are sending data through a nic that this router is not connected to");
 			if(currentPacket==null)
 				System.out.println("Warning (LSR NIC): You are sending a null packet");
-		}
+		}		
 		
-		
-		parent.sendPacket(currentPacket);
+		//parent.sendPacket(currentPacket);
+		this.runRED(currentPacket);
 		
 	}
 	
@@ -53,11 +54,37 @@ public class LSRNIC {
 	 * @since 1.0
 	 */
 	private void runRED(Packet currentPacket){
+			
 		boolean packetDropped = false;
 		double dropProbability = 0.0;
 		
-		outputBuffer.add(currentPacket);
+		if (outputBuffer.size() > this.startDropAt) {
+			if (outputBuffer.size() < this.maximumBuffer) {
+				dropProbability = (outputBuffer.size() - this.startDropAt) 
+						/ (double)(this.maximumBuffer - this.startDropAt);
+			}
+			else {
+				dropProbability = 1;
+			}
+		}
+		
+		if (dropProbability > 0) {
+			double r = Math.random() * 1.0 / dropProbability;
+			if (r <= 1.0) {
+				packetDropped = true;
+			}
+		}
+		
+		// Output to the console what happened
+		if(packetDropped)
+			System.out.println("The packet " + currentPacket.getTraceID() + " was dropped with probability " + dropProbability);
+		else {
+			outputBuffer.add(currentPacket);
+			if(this.trace)
+				System.out.println("The packet " + currentPacket.getTraceID() + " was added to the output queue");
+		}
 	}
+	
 	
 	/**
 	 * This method connects a link to this nic
@@ -75,7 +102,7 @@ public class LSRNIC {
 	 */
 	public void receivePacket(Packet currentPacket){
 		this.inputBuffer.add(currentPacket);
-
+		//this.runRED(currentPacket);
 	}
 	
 	/**
@@ -105,4 +132,6 @@ public class LSRNIC {
 	public LSR getParent() {
 		return this.parent;
 	}
+	
+
 }

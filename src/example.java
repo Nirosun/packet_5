@@ -48,12 +48,15 @@ public class example {
 		
 		//send packets from router 1 to the other routers...
 		r1.createPacket(11, 0);
-		r1.createPacket(3, 0);
-		r1.createPacket(11, 0);
-		r1.createPacket(13, 0);
-		r1.createPacket(14, 0);
+		//r1.createPacket(3, 0);
+		//r1.createPacket(11, 0);
+		//r1.createPacket(13, 0);
+		//r1.createPacket(14, 0);
+		r3.createPacket(9, 0);
 		
-		tock();
+		for (int i = 0; i < 30; i ++) {
+			tock();
+		}
 	}
 	
 	public void tock(){
