@@ -280,7 +280,7 @@ public class LSR{
 				currentPacket.getFirstMPLS().setLabel(outVC);
 				outNIC.sendPacket(currentPacket, this);
 				if (this.trace) {
-					System.out.println("Sending packet " + currentPacket.getTraceID() + " from router " + this.getAddress());
+					System.out.println("Sending packet " + currentPacket.getTraceID() + " from router " + this.getAddress() + " to " + currentPacket.getDest());
 				}
 			}
 			else {
@@ -500,7 +500,7 @@ public class LSR{
 	 */
 	private void sentPath(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND PATH: Router " +this.address+ " sent a PATH message " + packet.getTraceID());
+		System.out.println("SND PATH: Router " +this.address+ " sent a PATH message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
@@ -509,7 +509,7 @@ public class LSR{
 	 */
 	private void receivedPath(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC PATH: Router " +this.address+ " received a PATH message " + packet.getTraceID());
+		System.out.println("REC PATH: Router " +this.address+ " received a PATH message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
@@ -518,7 +518,7 @@ public class LSR{
 	 */
 	private void sentResv(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND RESV: Router " +this.address+ " sent a RESV message " + packet.getTraceID());
+		System.out.println("SND RESV: Router " +this.address+ " sent a RESV message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
@@ -527,7 +527,7 @@ public class LSR{
 	 */
 	private void receivedResv(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC RESV: Router " +this.address+ " received a RESV message " + packet.getTraceID());
+		System.out.println("REC RESV: Router " +this.address+ " received a RESV message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
