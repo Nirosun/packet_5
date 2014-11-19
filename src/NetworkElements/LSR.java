@@ -199,12 +199,6 @@ public class LSR{
 				}				
 				// forward RESV
 				if (this.currentConnAttemptNIC != null) {
-					
-					/*if (currentPacket.getDest() == this.getAddress()) {	// RESV reaches the SOURCE
-						this.destLabel.put(currentPacket.getSource(), outVC);
-						//this.VCtoVC.put(arg0, arg1)
-					}*/
-					//ATMCell conn = new ATMCell(0, "connect " + outVC, this.getTraceID());
 					Packet resv = new Packet(currentPacket.getSource(), currentPacket.getDest(), currentPacket.getDSCP());
 					resv.setIsOAM(true);
 					resv.setIsResv(true);
@@ -222,9 +216,17 @@ public class LSR{
 					this.destLabel.put(currentPacket.getSource(), outVC);
 					this.VCtoVC.put(outVC, new NICLabelPair(nic, inVC));
 					System.out.println("The connection is setup on VC " + outVC);
-					//System.out.println("Error: currentConnAttemptNIC is null.");
-					ArrayList<Integer> deleteID = new ArrayList<Integer>();
 					
+					// send RESVCONF
+					Packet conf = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
+					conf.setIsOAM(true);
+					conf.setIsResvConf(true);
+					conf.setTraceID(this.getTraceID());
+					this.sentResvConf(conf);
+					nic.sendPacket(conf, this);
+														
+					// send packets in the waiting list
+					ArrayList<Integer> deleteID = new ArrayList<Integer>();
 					for (int i = 0; i < this.waitList.size(); i ++) {
 						Packet packet = this.waitList.get(i);
 						if (this.destLabel.containsKey(packet.getDest()) && this.destLabel.get(packet.getDest()) != -1) {
@@ -240,18 +242,27 @@ public class LSR{
 					for (int i = deleteID.size() - 1; i >= 0; i --) {
 						int tmp = deleteID.get(i);
 						this.waitList.remove(tmp);
-					}
-					
+					}					
 					return;
 				}
-
 			}
+			
+			// RESVCONF
+			else if (currentPacket.getIsResvConf()) {
+				this.receivedResvConf(currentPacket);
+				if (this.getAddress() != currentPacket.getDest()) {
+					LSRNIC fwdnic = this.nextHop.get(currentPacket.getDest());
+					fwdnic.sendPacket(currentPacket, this);
+				}
+			}
+			
 			else {
 				System.out.println("Error: Message not implemented.");
 			}			
 		}
 		
-		else {	// send NORMAL packets
+		// send NORMAL packets
+		else {	
 			// find the nic and new VC number to forward the cell on
 			// otherwise the cell has nowhere to go. output to the console and drop the cell
 			if (this.VCtoVC.isEmpty()) {
@@ -553,6 +564,24 @@ public class LSR{
 	private void receivedResvErr(Packet packet){
 		if(this.displayCommands)
 		System.out.println("REC RESVERR: Router " +this.address+ " received a RESVERR message " + packet.getTraceID());
+	}
+	
+	/**
+	 * Outputs to the console that a RESVCONF message has been sent
+	 * @since 1.0
+	 */
+	private void sentResvConf(Packet packet){
+		if(this.displayCommands)
+		System.out.println("SND RESVCONF: Router " +this.address+ " sent a RESVCONF message " + packet.getTraceID());
+	}
+	
+	/**
+	 * Outputs to the console that a RESVCONF message has been received
+	 * @since 1.0
+	 */
+	private void receivedResvConf(Packet packet){
+		if(this.displayCommands)
+		System.out.println("REC RESVCONF: Router " +this.address+ " received a RESVCONF message " + packet.getTraceID());
 	}
 	
 	/**

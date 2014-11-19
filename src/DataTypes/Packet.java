@@ -14,7 +14,7 @@ public class Packet {
 	private boolean isResvErr = false;
 	private boolean isWait = false;
 	private int traceID = 0; // The trace ID for the packet
-	private int addrForWait = 0;
+	//private int addrForWait = 0;
 	
 	// temp
 	//private int label;
@@ -206,16 +206,16 @@ public class Packet {
 	/**
 	 * Get addr for wait
 	 */
-	public int getAddrForWait() {
+	/*public int getAddrForWait() {
 		return this.addrForWait;
-	}
+	}*/
 	
 	/**
 	 * Set addr for wait
 	 */
-	public void setAddrForWait(int addr) {
+	/*public void setAddrForWait(int addr) {
 		this.addrForWait = addr;
-	}
+	}*/
 	
 	/**
 	 * Get first MPLS header
