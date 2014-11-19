@@ -8,9 +8,10 @@ public class LSR{
 	private int address; // The AS address of this router
 	private ArrayList<LSRNIC> nics = new ArrayList<LSRNIC>(); // all of the nics in this router
 	private TreeMap<Integer, LSRNIC> nextHop = new TreeMap<Integer, LSRNIC>(); // a map of which interface to use to get to a given router on the network
-	private TreeMap<Integer, NICLabelPair> VCtoVC = new TreeMap<Integer, NICLabelPair>(); // a map of input VC to output nic and new VC number
-	private HashMap<Integer, Integer> destLabel = new HashMap<Integer, Integer>();
-	private ArrayList<Packet> waitList = new ArrayList<Packet>();
+	private TreeMap<Integer, NICLabelPair> LabeltoLabel = new TreeMap<Integer, NICLabelPair>(); // a map of input VC to output nic and new VC number
+	private HashMap<Integer, Integer> destLabel = new HashMap<Integer, Integer>();	// map between destination and input label, only used when creating packets	
+	private ArrayList<Packet> waitList = new ArrayList<Packet>();	// packets waiting to be send due to path setting up
+	//private HashMap<Integer, Integer> classBW = new HashMap<Integer, Integer>();	// map between traffic class and its allocated bandwidth
 	
 	private boolean trace = true; // should we print out debug code?
 	private int traceID = (int) (Math.random() * 100000); // create a random trace id for cells
@@ -88,22 +89,22 @@ public class LSR{
 					this.receivedPath(currentPacket);
 					
 					// send RESV
-					int thisVC;
-					if (!this.VCtoVC.isEmpty()) {
-						thisVC = this.VCtoVC.lastKey() + 1;
+					int thisLabel;
+					if (!this.LabeltoLabel.isEmpty()) {
+						thisLabel = this.LabeltoLabel.lastKey() + 1;
 					}
 					else {
-						thisVC = 1;
+						thisLabel = 1;
 					}
 					if (trace) {
-						System.out.println("Trace (ATMRouter): First free LSP = " + thisVC);
+						System.out.println("Trace (ATMRouter): First free LSP = " + thisLabel);
 					}
-					this.VCtoVC.put(thisVC, new NICLabelPair(nic, thisVC));
+					this.LabeltoLabel.put(thisLabel, new NICLabelPair(nic, thisLabel));
 					
 					Packet resv = new Packet(this.getAddress(), currentPacket.getSource(), currentPacket.getDSCP());
 					resv.setIsOAM(true);
 					resv.setIsResv(true);
-					resv.addMPLSheader(new MPLS(thisVC, 0, 1));
+					resv.addMPLSheader(new MPLS(thisLabel, 0, 1));
 					resv.setTraceID(this.getTraceID());
 					this.sentResv(resv);
 					nic.sendPacket(resv, this);					
@@ -184,15 +185,15 @@ public class LSR{
 			
 			// RESV
 			else if (currentPacket.getIsResv()) {
-				int inVC = currentPacket.getFirstMPLS().getLabel();
-				int outVC = 1;
+				int inLabel = currentPacket.getFirstMPLS().getLabel();
+				int outLabel = 1;
 				this.receivedResv(currentPacket);
 				
-				if (!this.VCtoVC.isEmpty()) {
-					outVC = this.VCtoVC.lastKey() + 1;
-					for (int i = 1; i < this.VCtoVC.lastKey(); i ++) {
-						if (!this.VCtoVC.containsKey(i)) {
-							outVC = i;
+				if (!this.LabeltoLabel.isEmpty()) {
+					outLabel = this.LabeltoLabel.lastKey() + 1;
+					for (int i = 1; i < this.LabeltoLabel.lastKey(); i ++) {
+						if (!this.LabeltoLabel.containsKey(i)) {
+							outLabel = i;
 							break;
 						}
 					}
@@ -203,19 +204,17 @@ public class LSR{
 					resv.setIsOAM(true);
 					resv.setIsResv(true);
 					resv.setTraceID(this.getTraceID());
-					//resv.setLabel(outVC);
 					resv.addMPLSheader(currentPacket.getFirstMPLS());
-					resv.getFirstMPLS().setLabel(outVC);
+					resv.getFirstMPLS().setLabel(outLabel);
 					this.sentResv(resv);
 					this.currentConnAttemptNIC.sendPacket(resv, this);
-					this.VCtoVC.put(outVC, new NICLabelPair(nic, inVC));
-					//this.VCtoVC.put(inVC, new NICVCPair(this.currentConnAttemptNIC, outVC));
+					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
 					this.currentConnAttemptNIC = null;
 				}
 				else {	// RESV reaches the SOURCE node???
-					this.destLabel.put(currentPacket.getSource(), outVC);
-					this.VCtoVC.put(outVC, new NICLabelPair(nic, inVC));
-					System.out.println("The connection is setup on VC " + outVC);
+					this.destLabel.put(currentPacket.getSource(), outLabel);
+					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
+					System.out.println("The connection is setup on VC " + outLabel);
 					
 					// send RESVCONF
 					Packet conf = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
@@ -230,7 +229,7 @@ public class LSR{
 					for (int i = 0; i < this.waitList.size(); i ++) {
 						Packet packet = this.waitList.get(i);
 						if (this.destLabel.containsKey(packet.getDest()) && this.destLabel.get(packet.getDest()) != -1) {
-							packet.addMPLSheader(new MPLS(inVC, 0, 1));
+							packet.addMPLSheader(new MPLS(inLabel, 0, 1));
 							nic.sendPacket(packet, this);
 							if (trace) {
 								System.out.println("Sending packet " + packet.getTraceID() + " from router " + this.getAddress());
@@ -265,17 +264,16 @@ public class LSR{
 		else {	
 			// find the nic and new VC number to forward the cell on
 			// otherwise the cell has nowhere to go. output to the console and drop the cell
-			if (this.VCtoVC.isEmpty()) {
+			if (this.LabeltoLabel.isEmpty()) {
 				System.out.println("Error: vc lookup table is empty.");
 				return;
 			}
-			if (!this.VCtoVC.containsKey(currentPacket.getFirstMPLS().getLabel())) {
-				//this.cellNoVC(cell);
+			if (!this.LabeltoLabel.containsKey(currentPacket.getFirstMPLS().getLabel())) {
 				System.out.println("Error: No VC found.");
 				return;
 			}
-			int outVC = this.VCtoVC.get(currentPacket.getFirstMPLS().getLabel()).getVC();
-			LSRNIC outNIC = this.VCtoVC.get(currentPacket.getFirstMPLS().getLabel()).getNIC();
+			int outVC = this.LabeltoLabel.get(currentPacket.getFirstMPLS().getLabel()).getVC();
+			LSRNIC outNIC = this.LabeltoLabel.get(currentPacket.getFirstMPLS().getLabel()).getNIC();
 			if (outNIC != nic) {
 				currentPacket.getFirstMPLS().setLabel(outVC);
 				outNIC.sendPacket(currentPacket, this);
@@ -284,7 +282,6 @@ public class LSR{
 				}
 			}
 			else {
-				//this.cellDeadEnd(cell);
 				if (trace) {
 					System.out.println("Packet " + currentPacket.getTraceID() + " reaches the end at " + this.getAddress());
 				}
@@ -299,15 +296,14 @@ public class LSR{
 	 * @param DSCP the differentiated services code point field
 	 * @since 1.0
 	 */
-	public void createPacket(int destination, int DSCP){
+	public void createPacket(int destination, int DSCP) {
 		if (this.isStart) {
 			this.calculateNextHop();
 			this.isStart = false;
 		}
 		Packet newPacket= new Packet(this.getAddress(), destination, DSCP);
 		newPacket.setTraceID(this.getTraceID());
-		this.sendPacket(newPacket);		
-		
+		this.sendPacket(newPacket);				
 	}
 
 	/**
@@ -318,7 +314,7 @@ public class LSR{
 	 * @param Bandwidth number of packets per time unit for this PHB/Class
 	 * @since 1.0
 	 */
-	public void allocateBandwidth(int dest, int PHB, int Class, int Bandwidth){
+	public void allocateBandwidth(int dest, int PHB, int Class, int Bandwidth) {
 		
 	}
 	
@@ -335,7 +331,7 @@ public class LSR{
 		
 		if (this.destLabel.containsKey(dest) && this.destLabel.get(dest) != -1) {
 			int inLabel = this.destLabel.get(dest);
-			int outLabel = this.VCtoVC.get(inLabel).getVC();
+			int outLabel = this.LabeltoLabel.get(inLabel).getVC();
 			newPacket.addMPLSheader(new MPLS(outLabel, 0, 1));
 			nic.sendPacket(newPacket, this);
 			if (this.trace) {
@@ -364,10 +360,6 @@ public class LSR{
 	 * @since 1.0
 	 */
 	public void sendPackets(){
-		/*if (this.isStart) {
-			this.calculateNextHop();
-			this.isStart = false;
-		}*/
 		for(int i=0; i<this.nics.size(); i++)
 			this.nics.get(i).sendPackets();
 	}
@@ -392,16 +384,12 @@ public class LSR{
 	}
 	
 	/**
-	 * Calculate nexthop
-	 * @param destAddress the destination address of the ATM router
-	 * @param outInterface the interface to use to connect to that router
+	 * Using Dijkstra algorithm to calculate this.nexthop
 	 * @since 1.0
 	 */
 	public void calculateNextHop(){
-		//this.nextHop.put(destAddress, outInterface);
 		int origin = this.getAddress();
-		int v0 = 0;
-		//Set<Integer> Vset = GraphInfo.graph.keySet();
+		int v0 = 0;		// the origin node
 		ArrayList<Integer> nodes = new ArrayList<Integer>();
 		
 		for (Integer node : GraphInfo.graph.keySet()) {
@@ -411,9 +399,9 @@ public class LSR{
 			}		
 		}
 		
-		int n = nodes.size();
-		ArrayList<Integer> dist = new ArrayList<Integer>();
-		ArrayList<Integer> path = new ArrayList<Integer>();
+		int n = nodes.size();	
+		ArrayList<Integer> dist = new ArrayList<Integer>();	// distance to origin node
+		ArrayList<Integer> path = new ArrayList<Integer>();	// path to origin node
 		ArrayList<Boolean> visited = new ArrayList<Boolean>();
 		ArrayList<LSRNIC> niclist = GraphInfo.nics.get(origin);
 		ArrayList<Integer> neighborlist = GraphInfo.graph.get(origin);

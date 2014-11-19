@@ -13,12 +13,8 @@ public class Packet {
 	private boolean isPathErr = false;
 	private boolean isResvErr = false;
 	private boolean isWait = false;
-	private int traceID = 0; // The trace ID for the packet
-	//private int addrForWait = 0;
-	
-	// temp
-	//private int label;
-	
+	private int traceID = 0;	// The trace ID for the packet
+
 	
 	/**
 	 * The default constructor for a packet
