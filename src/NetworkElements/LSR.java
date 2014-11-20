@@ -9,17 +9,17 @@ public class LSR{
 	private ArrayList<LSRNIC> nics = new ArrayList<LSRNIC>(); // all of the nics in this router
 	private TreeMap<Integer, LSRNIC> nextHop = new TreeMap<Integer, LSRNIC>(); // a map of which interface to use to get to a given router on the network
 	private TreeMap<Integer, NICLabelPair> LabeltoLabel = new TreeMap<Integer, NICLabelPair>(); // a map of input VC to output nic and new VC number
-	//private HashMap<Integer, Integer> destLabel = new HashMap<Integer, Integer>();	// map between destination and input label, only used when creating packets
 	private HashMap<DestDSCPPair, Integer> destDSCPtoLabel = new HashMap<DestDSCPPair, Integer>();
 	private HashMap<DestDSCPPair, Integer> destDSCPtoBW = new HashMap<DestDSCPPair, Integer>();	// map between traffic class and its allocated bandwidth
 	private ArrayList<Packet> waitList = new ArrayList<Packet>();	// packets waiting to be send due to path setting up
 	
-	private boolean trace = true; // should we print out debug code?
+	private boolean trace = false; // should we print out debug code?
 	private int traceID = (int) (Math.random() * 100000); // create a random trace id for cells
 	private LSRNIC currentConnAttemptNIC = null; // The nic that is currently trying to setup a connection
 	private boolean displayCommands = true; // should we output the commands that are received?
 	private boolean isStart = true;	// used for deciding if setting up nexthop table
-	private int remainBandwidth = 50;	// for bandwidth reservation, not used yet
+	
+	private int remainBandwidth = 50;	// for bandwidth reservation
 	
 	/**
 	 * The default constructor for an ATM router
@@ -226,7 +226,6 @@ public class LSR{
 								System.out.println("Sending packet " + packet.getTraceID() + " from router " + this.getAddress());
 							}
 							deleteID.add(i);
-							//this.waitList.remove(packet);
 						}
 					}
 					for (int i = deleteID.size() - 1; i >= 0; i --) {
@@ -253,8 +252,8 @@ public class LSR{
 		
 		// send NORMAL packets
 		else {	
-			// find the nic and new VC number to forward the cell on
-			// otherwise the cell has nowhere to go. output to the console and drop the cell
+			// find the nic and new LSP number to forward the packet on
+			// otherwise the packet has nowhere to go. output to the console and drop the packet
 			if (this.LabeltoLabel.isEmpty()) {
 				System.out.println("Error: vc lookup table is empty.");
 				return;
@@ -263,10 +262,10 @@ public class LSR{
 				System.out.println("Error: No VC found.");
 				return;
 			}
-			int outVC = this.LabeltoLabel.get(currentPacket.getFirstMPLS().getLabel()).getVC();
+			int outLabel = this.LabeltoLabel.get(currentPacket.getFirstMPLS().getLabel()).getVC();
 			LSRNIC outNIC = this.LabeltoLabel.get(currentPacket.getFirstMPLS().getLabel()).getNIC();
 			if (outNIC != nic) {
-				currentPacket.getFirstMPLS().setLabel(outVC);
+				currentPacket.getFirstMPLS().setLabel(outLabel);
 				outNIC.sendPacket(currentPacket, this);
 				if (this.trace) {
 					System.out.println("Sending packet " + currentPacket.getTraceID() + " from router " + this.getAddress() + " to " + currentPacket.getDest());
@@ -491,7 +490,7 @@ public class LSR{
 	 */
 	private void sentPath(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND PATH: Router " +this.address+ " sent a PATH message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
+		System.out.println("Router " +this.address+ " sent a PATH to Router " + packet.getDest());
 	}
 	
 	/**
@@ -500,7 +499,7 @@ public class LSR{
 	 */
 	private void receivedPath(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC PATH: Router " +this.address+ " received a PATH message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
+		System.out.println("Router " +this.address+ " received a PATH from Router " + packet.getSource());
 	}
 	
 	/**
@@ -509,7 +508,7 @@ public class LSR{
 	 */
 	private void sentResv(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND RESV: Router " +this.address+ " sent a RESV message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
+		System.out.println("Router " +this.address+ " sent a RESV to Router " + packet.getDest());
 	}
 	
 	/**
@@ -518,7 +517,7 @@ public class LSR{
 	 */
 	private void receivedResv(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC RESV: Router " +this.address+ " received a RESV message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
+		System.out.println("Router " +this.address+ " received a RESV from Router " + packet.getSource());
 	}
 	
 	/**
@@ -527,7 +526,7 @@ public class LSR{
 	 */
 	private void sentPathErr(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND PATHERR: Router " +this.address+ " sent a PATHERR message " + packet.getTraceID());
+		System.out.println("Router " +this.address+ " sent a PATHERR to Router " + packet.getDest());
 	}
 	
 	/**
@@ -536,7 +535,7 @@ public class LSR{
 	 */
 	private void receivedPathErr(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC PATHERR: Router " +this.address+ " received a PATHERR message " + packet.getTraceID());
+		System.out.println("Router " +this.address+ " received a PATHERR from Router " + packet.getSource());
 	}
 	
 	/**
@@ -545,7 +544,7 @@ public class LSR{
 	 */
 	private void sentResvErr(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND RESVERR: Router " +this.address+ " sent a RESVERR message " + packet.getTraceID());
+		System.out.println("Router " +this.address+ " sent a RESVERR to Router " + packet.getDest());
 	}
 	
 	/**
@@ -554,7 +553,7 @@ public class LSR{
 	 */
 	private void receivedResvErr(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC RESVERR: Router " +this.address+ " received a RESVERR message " + packet.getTraceID());
+		System.out.println("Router " +this.address+ " received a RESVERR from Router " + packet.getSource());
 	}
 	
 	/**
@@ -563,7 +562,7 @@ public class LSR{
 	 */
 	private void sentResvConf(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND RESVCONF: Router " +this.address+ " sent a RESVCONF message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
+		System.out.println("Router " +this.address+ " sent a RESVCONF to Router " + packet.getDest());
 	}
 	
 	/**
@@ -572,25 +571,7 @@ public class LSR{
 	 */
 	private void receivedResvConf(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC RESVCONF: Router " +this.address+ " received a RESVCONF message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
-	}
-	
-	/**
-	 * Outputs to the console that a WAIT message has been sent
-	 * @since 1.0
-	 */
-	private void sentWait(Packet packet){
-		if(this.displayCommands)
-		System.out.println("SND WAIT: Router " +this.address+ " sent a WAIT message " + packet.getTraceID());
-	}
-	
-	/**
-	 * Outputs to the console that a WAIT message has been received
-	 * @since 1.0
-	 */
-	private void receivedWait(Packet packet){
-		if(this.displayCommands)
-		System.out.println("REC WAIT: Router " +this.address+ " received a WAIT message " + packet.getTraceID());
+		System.out.println("Router " +this.address+ " received a RESVCONF from Router " + packet.getSource());
 	}
 	
 }

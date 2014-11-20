@@ -36,9 +36,7 @@ public class example {
 		OtoOLink l2 = new OtoOLink(r2n2, r3n1);
 		OtoOLink l3 = new OtoOLink(r2n3, r4n1);
 		OtoOLink l4 = new OtoOLink(r4n2, r5n1);
-		
-		//HashMap<Integer, ArrayList<Integer>> graph = GraphInfo.graph;
-		
+				
 		// Add the objects that need to move in time to an array
 		this.allConsumers.add(r1);
 		this.allConsumers.add(r2);
@@ -49,7 +47,7 @@ public class example {
 		//send packets from router 1 to the other routers...
 		r1.createPacket(11, 0);
 		r1.createPacket(3, 0);
-		r1.createPacket(11, 1);
+		r1.createPacket(11, 0);
 		r1.createPacket(13, 0);
 		r1.createPacket(14, 0);
 		//r3.createPacket(9, 0);
