@@ -59,7 +59,7 @@ public class example {
 		r5.createPacket(13, 0);
 		
 		
-		for (int i = 0; i < 50; i ++) {
+		for (int i = 0; i < 20; i ++) {
 			tock();
 		}
 	}

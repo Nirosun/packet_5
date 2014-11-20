@@ -68,7 +68,7 @@ public class LSR{
 			
 			// PATH
 			if (currentPacket.getIsPath()) {					
-				if (this.currentConnAttemptNIC != null) {	// busy, send wait
+				/*if (this.currentConnAttemptNIC != null) {	// busy, send wait
 					//ATMCell wait = new ATMCell(0, "wait " + toAddress, this.getTraceID());
 					Packet wait = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
 					wait.setIsOAM(true);
@@ -83,7 +83,7 @@ public class LSR{
 					this.sentWait(wait);
 					nic.sendPacket(wait, this);
 					return;
-				}
+				}*/
 				
 				if (this.address == toAddress) {	// dest address match
 					this.receivedPath(currentPacket);
@@ -124,18 +124,18 @@ public class LSR{
 						//this.currentConnAttemptNIC = nicSent;
 					}
 					else {
-						for (LSRNIC nicSent : this.nics) {
+						/*for (LSRNIC nicSent : this.nics) {
 							if (!nicSent.equals(nic)) {
 								nicSent.sendPacket(currentPacket, this);
 								//this.currentConnAttemptNIC = nicSent;
 							}
-						}
+						}*/
 					}
 				}
 			}
 			
 			// WAIT
-			else if (currentPacket.getIsWait()) {	
+			/*else if (currentPacket.getIsWait()) {	
 				this.receivedWait(currentPacket);   
 				if (this.destLabel.containsKey(currentPacket.getDest())) {	// LSP has been set up
 					return;
@@ -146,7 +146,7 @@ public class LSR{
 				resent.setTraceID(this.getTraceID());
 				this.sentPath(resent);
 				nic.sendPacket(resent, this);
-			}
+			}*/
 			
 			// PATHERR
 			else if (currentPacket.getIsPathErr()) {	
@@ -199,7 +199,7 @@ public class LSR{
 					}
 				}				
 				// forward RESV
-				if (this.currentConnAttemptNIC != null) {
+				if (currentPacket.getDest() != this.getAddress()) {
 					Packet resv = new Packet(currentPacket.getSource(), currentPacket.getDest(), currentPacket.getDSCP());
 					resv.setIsOAM(true);
 					resv.setIsResv(true);
@@ -207,14 +207,17 @@ public class LSR{
 					resv.addMPLSheader(currentPacket.getFirstMPLS());
 					resv.getFirstMPLS().setLabel(outLabel);
 					this.sentResv(resv);
-					this.currentConnAttemptNIC.sendPacket(resv, this);
+					LSRNIC fwdnic = this.nextHop.get(currentPacket.getDest());
+					fwdnic.sendPacket(resv, this);
 					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
 					this.currentConnAttemptNIC = null;
 				}
 				else {	// RESV reaches the SOURCE node???
 					this.destLabel.put(currentPacket.getSource(), outLabel);
 					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
-					System.out.println("The connection is setup on VC " + outLabel);
+					if (trace) {
+						System.out.println("The connection is setup on LSP " + outLabel);
+					}
 					
 					// send RESVCONF
 					Packet conf = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
@@ -560,7 +563,7 @@ public class LSR{
 	 */
 	private void sentResvConf(Packet packet){
 		if(this.displayCommands)
-		System.out.println("SND RESVCONF: Router " +this.address+ " sent a RESVCONF message " + packet.getTraceID());
+		System.out.println("SND RESVCONF: Router " +this.address+ " sent a RESVCONF message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
@@ -569,7 +572,7 @@ public class LSR{
 	 */
 	private void receivedResvConf(Packet packet){
 		if(this.displayCommands)
-		System.out.println("REC RESVCONF: Router " +this.address+ " received a RESVCONF message " + packet.getTraceID());
+		System.out.println("REC RESVCONF: Router " +this.address+ " received a RESVCONF message " + packet.getTraceID() + " from " + packet.getSource() + " to " + packet.getDest());
 	}
 	
 	/**
