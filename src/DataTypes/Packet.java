@@ -14,6 +14,7 @@ public class Packet {
 	private boolean isResvErr = false;
 	private boolean isWait = false;
 	private int traceID = 0;	// The trace ID for the packet
+	private int bandwidth = 0;
 
 	
 	/**
@@ -195,23 +196,29 @@ public class Packet {
 		return this.traceID;
 	}
 	
+	/**
+	 * set trace id
+	 * @param id
+	 */
 	public void setTraceID(int id) {
 		this.traceID = id;
 	}
 	
 	/**
-	 * Get addr for wait
+	 * get bandwidth
+	 * @return
 	 */
-	/*public int getAddrForWait() {
-		return this.addrForWait;
-	}*/
+	public int getBandwidth() {
+		return this.bandwidth;
+	}
 	
 	/**
-	 * Set addr for wait
+	 * set bandwidth
+	 * @param bw
 	 */
-	/*public void setAddrForWait(int addr) {
-		this.addrForWait = addr;
-	}*/
+	public void setBandwidth(int bw) {
+		this.bandwidth = bw;
+	}
 	
 	/**
 	 * Get first MPLS header

@@ -9,16 +9,17 @@ public class LSR{
 	private ArrayList<LSRNIC> nics = new ArrayList<LSRNIC>(); // all of the nics in this router
 	private TreeMap<Integer, LSRNIC> nextHop = new TreeMap<Integer, LSRNIC>(); // a map of which interface to use to get to a given router on the network
 	private TreeMap<Integer, NICLabelPair> LabeltoLabel = new TreeMap<Integer, NICLabelPair>(); // a map of input VC to output nic and new VC number
-	private HashMap<Integer, Integer> destLabel = new HashMap<Integer, Integer>();	// map between destination and input label, only used when creating packets	
+	//private HashMap<Integer, Integer> destLabel = new HashMap<Integer, Integer>();	// map between destination and input label, only used when creating packets
+	private HashMap<DestDSCPPair, Integer> destDSCPtoLabel = new HashMap<DestDSCPPair, Integer>();
+	private HashMap<DestDSCPPair, Integer> destDSCPtoBW = new HashMap<DestDSCPPair, Integer>();	// map between traffic class and its allocated bandwidth
 	private ArrayList<Packet> waitList = new ArrayList<Packet>();	// packets waiting to be send due to path setting up
-	//private HashMap<Integer, Integer> classBW = new HashMap<Integer, Integer>();	// map between traffic class and its allocated bandwidth
 	
 	private boolean trace = true; // should we print out debug code?
 	private int traceID = (int) (Math.random() * 100000); // create a random trace id for cells
 	private LSRNIC currentConnAttemptNIC = null; // The nic that is currently trying to setup a connection
 	private boolean displayCommands = true; // should we output the commands that are received?
 	private boolean isStart = true;	// used for deciding if setting up nexthop table
-	//private int currentDestAddr = -1;
+	private int remainBandwidth = 50;	// for bandwidth reservation, not used yet
 	
 	/**
 	 * The default constructor for an ATM router
@@ -59,31 +60,12 @@ public class LSR{
 			this.calculateNextHop();
 			this.isStart = false;
 		}
-		
-		//int currentDSCP = currentPacket.getDSCP();
-		
-		///////////
+
 		if(currentPacket.getIsOAM()){	// OAM packet
 			int toAddress = currentPacket.getDest();
 			
 			// PATH
 			if (currentPacket.getIsPath()) {					
-				/*if (this.currentConnAttemptNIC != null) {	// busy, send wait
-					//ATMCell wait = new ATMCell(0, "wait " + toAddress, this.getTraceID());
-					Packet wait = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
-					wait.setIsOAM(true);
-					wait.setIsWait(true);
-					wait.setTraceID(this.getTraceID());
-					
-//////////////////////////////////////////////////Should save all the contents?
-					//wait.setAddrForWait(toAddress);
-					//this.currentDestAddr = toAddress;
-//////////////////////////////////////////////////					
-					
-					this.sentWait(wait);
-					nic.sendPacket(wait, this);
-					return;
-				}*/
 				
 				if (this.address == toAddress) {	// dest address match
 					this.receivedPath(currentPacket);
@@ -106,6 +88,7 @@ public class LSR{
 					resv.setIsResv(true);
 					resv.addMPLSheader(new MPLS(thisLabel, 0, 1));
 					resv.setTraceID(this.getTraceID());
+					resv.setBandwidth(currentPacket.getBandwidth());
 					this.sentResv(resv);
 					nic.sendPacket(resv, this);					
 				}
@@ -123,30 +106,15 @@ public class LSR{
 						nicSent.sendPacket(currentPacket, this);
 						//this.currentConnAttemptNIC = nicSent;
 					}
-					else {
-						/*for (LSRNIC nicSent : this.nics) {
-							if (!nicSent.equals(nic)) {
-								nicSent.sendPacket(currentPacket, this);
-								//this.currentConnAttemptNIC = nicSent;
-							}
-						}*/
+					else {	// can't find dest addr in nexthop, send PATHERR
+						Packet patherr = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
+						patherr.setIsOAM(true);
+						patherr.setIsPathErr(true);
+						this.sentPathErr(patherr);
+						nic.sendPacket(patherr, this);
 					}
 				}
 			}
-			
-			// WAIT
-			/*else if (currentPacket.getIsWait()) {	
-				this.receivedWait(currentPacket);   
-				if (this.destLabel.containsKey(currentPacket.getDest())) {	// LSP has been set up
-					return;
-				}
-				Packet resent = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
-				resent.setIsOAM(true);
-				resent.setIsPath(true);
-				resent.setTraceID(this.getTraceID());
-				this.sentPath(resent);
-				nic.sendPacket(resent, this);
-			}*/
 			
 			// PATHERR
 			else if (currentPacket.getIsPathErr()) {	
@@ -173,6 +141,8 @@ public class LSR{
 					resent.setIsOAM(true);
 					resent.setIsResv(true);
 					resent.setTraceID(this.getTraceID());
+					resent.setBandwidth(currentPacket.getBandwidth());
+					resent.addMPLSheader(currentPacket.getFirstMPLS());   // ????????????????
 					this.sentResv(resent);
 					nic.sendPacket(resent, this);
 				}
@@ -197,7 +167,24 @@ public class LSR{
 							break;
 						}
 					}
-				}				
+				}
+				
+				// Allocate Bandwidth
+				if (this.remainBandwidth >= currentPacket.getBandwidth()) {
+					this.remainBandwidth -= currentPacket.getBandwidth();
+				}
+				else {	// unable to reserve, send RESVERR
+					Packet resverr = new Packet(currentPacket.getDest(), currentPacket.getSource(), currentPacket.getDSCP());
+					resverr.setIsOAM(true);
+					resverr.setIsResvErr(true);
+					resverr.setTraceID(this.getTraceID());
+					resverr.setBandwidth(currentPacket.getBandwidth());
+					resverr.addMPLSheader(currentPacket.getFirstMPLS());	//????????????????
+					this.sentResvErr(resverr);
+					nic.sendPacket(resverr, this);
+					return;
+				}
+				
 				// forward RESV
 				if (currentPacket.getDest() != this.getAddress()) {
 					Packet resv = new Packet(currentPacket.getSource(), currentPacket.getDest(), currentPacket.getDSCP());
@@ -212,8 +199,8 @@ public class LSR{
 					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
 					this.currentConnAttemptNIC = null;
 				}
-				else {	// RESV reaches the SOURCE node???
-					this.destLabel.put(currentPacket.getSource(), outLabel);
+				else {	// RESV reaches the SOURCE node
+					this.destDSCPtoLabel.put(new DestDSCPPair(currentPacket.getSource(), currentPacket.getDSCP()), outLabel);
 					this.LabeltoLabel.put(outLabel, new NICLabelPair(nic, inLabel));
 					if (trace) {
 						System.out.println("The connection is setup on LSP " + outLabel);
@@ -231,7 +218,8 @@ public class LSR{
 					ArrayList<Integer> deleteID = new ArrayList<Integer>();
 					for (int i = 0; i < this.waitList.size(); i ++) {
 						Packet packet = this.waitList.get(i);
-						if (this.destLabel.containsKey(packet.getDest()) && this.destLabel.get(packet.getDest()) != -1) {
+						if (this.destDSCPtoLabel.containsKey(new DestDSCPPair(packet.getDest(), packet.getDSCP())) 
+								&& this.destDSCPtoLabel.get(new DestDSCPPair(packet.getDest(), packet.getDSCP())) != -1) {
 							packet.addMPLSheader(new MPLS(inLabel, 0, 1));
 							nic.sendPacket(packet, this);
 							if (trace) {
@@ -318,7 +306,14 @@ public class LSR{
 	 * @since 1.0
 	 */
 	public void allocateBandwidth(int dest, int PHB, int Class, int Bandwidth) {
-		
+		int DSCP = 0;
+		if (PHB == 1) {
+			DSCP = Class;
+		}
+		if (PHB == 2) {
+			DSCP = 5;
+		}
+		this.destDSCPtoBW.put(new DestDSCPPair(dest, DSCP), Bandwidth);
 	}
 	
 	/**
@@ -330,10 +325,12 @@ public class LSR{
 		
 		//This method should send the packet to the correct NIC.]
 		int dest = newPacket.getDest();
+		int DSCP = newPacket.getDSCP();
+		DestDSCPPair pair = new DestDSCPPair(dest, DSCP);
 		LSRNIC nic = this.nextHop.get(dest);
 		
-		if (this.destLabel.containsKey(dest) && this.destLabel.get(dest) != -1) {
-			int inLabel = this.destLabel.get(dest);
+		if (this.destDSCPtoLabel.containsKey(pair) && this.destDSCPtoLabel.get(pair) != -1) {
+			int inLabel = this.destDSCPtoLabel.get(pair);
 			int outLabel = this.LabeltoLabel.get(inLabel).getVC();
 			newPacket.addMPLSheader(new MPLS(outLabel, 0, 1));
 			nic.sendPacket(newPacket, this);
@@ -342,13 +339,16 @@ public class LSR{
 			}
 		}
 		
-		else if (!this.destLabel.containsKey(dest)) {
-			this.destLabel.put(dest, -1);
+		else if (!this.destDSCPtoLabel.containsKey(pair)) {
+			this.destDSCPtoLabel.put(pair, -1);
 			this.waitList.add(newPacket);
 			Packet path = new Packet(this.getAddress(), newPacket.getDest(), newPacket.getDSCP());
 			path.setIsOAM(true);
 			path.setIsPath(true);
 			path.setTraceID(this.getTraceID());
+			if (this.destDSCPtoBW.containsKey(new DestDSCPPair(newPacket.getDest(), newPacket.getDSCP()))) {
+				path.setBandwidth(this.destDSCPtoBW.get(new DestDSCPPair(newPacket.getDest(), newPacket.getDSCP())));
+			}
 			this.sentPath(path);
 			nic.sendPacket(path, this);
 		}		
